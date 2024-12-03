@@ -21,9 +21,59 @@ uint8_t x_array[100];
 uint8_t y_array[100];
 uint8_t z_array[100];
 
+// constants
+#define timerCounts 150   // Since we are setting 50 Hz, we get 150 timers counts in 3sec
+
+// variables for the timer
+volatile bool timerActive = true;       // flag indicating timer activity
+volatile unsigned int timerCounter = 0;  // counter for timer 1 overflows
+
+// timer interrupt on comparison
+ISR(TIMER1_COMPA_vect) {
+  if (timerActive) {
+    timerCounter++;
+    Serial.println(timerCounter);
+
+    if (timerCounter >= timerCounts) {
+      timerActive = false;  // Deactivate the timer
+      Serial.println("Timer ended!");
+    }
+  }
+}
+
 void setup() {
+  // clear global interrupts
+  cli();
+
+  // clear timer registers before we use them
+  TCCR1A = 0; // Normal Operations, no PWM
+  TCCR1B = 0;
+  
+  // set CTC mode,
+  TCCR1B |= (1 << WGM12);
+
+  // 64 prescaler
+  TCCR1B |= (1 << CS11) | (1 << CS10);
+
+   // calculate the wanted PWM 
+   // (F_CPU / 64) * (1 / 50) = 2500
+  OCR1A = 2500;
+  
+  // Enable Timer1 compare match interrupt
+  TIMSK1 |= (1 << OCIE1A);
+
+  // Initialize Serial
+  Serial.begin(9600);
+
+  // enable global interrupts
+  sei();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  if (!timerActive) {
+    delay(1000); // Wait for 1 second
+    timerCounter = 0; // Reset the counter
+    timerActive = true; // Reactivate the timer
+    Serial.println("Timer restarted!");
+  }
 }
