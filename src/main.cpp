@@ -16,6 +16,7 @@
 // LED - 4 colors
 
 #include <Arduino.h>
+#include <SPI.h>
 
 uint8_t x_array[100];
 uint8_t y_array[100];
@@ -25,8 +26,16 @@ uint8_t z_array[100];
 #define timerCounts 150   // Since we are setting 50 Hz, we get 150 timers counts in 3sec
 
 // variables for the timer
-volatile bool timerActive = true;       // flag indicating timer activity
+volatile bool timerActive = false;       // flag indicating timer activity
 volatile unsigned int timerCounter = 0;  // counter for timer 1 overflows
+
+// variables for the accelerometer
+const uint16_t x_low = 0x28;
+const uint16_t x_high = 0x29;
+const uint16_t y_low = 0x2A;
+const uint16_t y_high = 0x2B;
+const uint16_t z_low = 0x2C;
+const uint16_t z_high = 0x2D;
 
 // timer interrupt on comparison
 ISR(TIMER1_COMPA_vect) {
@@ -62,18 +71,31 @@ void setup() {
   // Enable Timer1 compare match interrupt
   TIMSK1 |= (1 << OCIE1A);
 
-  // Initialize Serial
-  Serial.begin(9600);
-
   // enable global interrupts
   sei();
+
+  // setup accelerometer
+  DDRB |= (1 << 4);
+
+   // Initialize Serial and SPI
+  Serial.begin(9600);
+  SPI.begin();
 }
 
 void loop() {
-  if (!timerActive) {
-    delay(1000); // Wait for 1 second
-    timerCounter = 0; // Reset the counter
-    timerActive = true; // Reactivate the timer
-    Serial.println("Timer restarted!");
-  }
+
+  PORTB &= ~(1 << 4);
+  SPI.transfer(0x0F | (1 << 7));
+  uint8_t res = SPI.transfer(0x00);
+  Serial.println(res, BIN);
+
+  PORTB |= (1 << 4);
+  delay(1000);
+
+  // if (!timerActive) {
+  //   delay(1000); // Wait for 1 second
+  //   timerCounter = 0; // Reset the counter
+  //   timerActive = true; // Reactivate the timer
+  //   Serial.println("Timer restarted!");
+  // }
 }
