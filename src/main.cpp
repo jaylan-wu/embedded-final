@@ -19,6 +19,7 @@
 // LED - 4 colors
 
 #include <Arduino.h>
+#include <colorlib.h> //modified Adafruit_Neopixel library 
 #include <SPI.h>
 
 uint8_t x_array[100];
@@ -27,6 +28,10 @@ uint8_t z_array[100];
 
 // constants
 #define timerCounts 150   // Since we are setting 50 Hz, we get 150 timers counts in 3sec
+#define NUMPIXELS 10
+#define NEOPIN 17
+
+colorlib strip(NUMPIXELS, NEOPIN); //set up LEDs 
 
 // control state = 0 waiting for first press of button (that will be when)
 // control state = 1 that is when we read the accel for the first persons gesture
@@ -62,6 +67,14 @@ ISR(TIMER1_COMPA_vect) {
   }
 }
 
+void colorNeo(uint16_t r, uint16_t g, uint16_t b){
+  strip.clear();
+  for(int i = 0; i < NUMPIXELS; i++){
+    strip.setPixelColor(i, r, g, b);
+  }
+  strip.show();
+}
+
 void setup() {
   // clear global interrupts
   cli();
@@ -92,6 +105,10 @@ void setup() {
   // setup button on PD4
   DDRD &= ~(1<<4); // Clear DDRD4 Bit to configure as input for the button
 
+  strip.begin();
+  strip.setBrightness(15);
+  strip.show(); // Initialize all pixels to 'off'
+
    // Initialize Serial and SPI
   Serial.begin(9600);
   SPI.begin();
@@ -105,6 +122,7 @@ void loop() {
     Serial.println(controlState);
 
     // show YELLOW LED on neopixels
+    colorNeo(255,255,0);
     
     // read button input
     if (PIND & (1<<PIND4)) {
@@ -113,21 +131,47 @@ void loop() {
       delay(250);
     }
   }
-  // control state 1 -  read accel values
-  if (controlState == 1) {
+  // control state 1 -  read accel values 3 seconds
+  if (controlState == 1) { 
     Serial.print("Control State: ");
     Serial.println(controlState);
+    colorNeo(255, 128, 0); //color orange
+    delay(3000);
+    controlState = 2;
   }
-  if (controlState == 2) {
+  // control state 2 - waiting for second button press. 
+  if (controlState == 2) { 
     Serial.print("Control State: ");
     Serial.println(controlState);
+    colorNeo(0, 0, 255); //color blue
+    // read button input
+    if (PIND & (1<<PIND4)) {
+      Serial.println("Button is pressed");
+      controlState = 3;     // move to next state
+      delay(250);
+    }
   }
+  // control state 3 - reading unlock
   if (controlState == 3) {
     Serial.print("Control State: ");
     Serial.println(controlState);
+    colorNeo(255, 128, 0); //color orange
+    delay(3000);
+    controlState = 4;
   }
   if (controlState == 4) {
     Serial.print("Control State: ");
     Serial.println(controlState);
+    if(true){
+      colorNeo(0,255,0);      
+    }
+    else{
+      colorNeo(255,0,0);
+    }
+    if (PIND & (1<<PIND4)) {
+      Serial.println("Button is pressed");
+      controlState = 0;     // move to next state
+      delay(250);
+    }
   }
 }
