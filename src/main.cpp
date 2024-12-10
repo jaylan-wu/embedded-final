@@ -2,8 +2,11 @@
 // Due 12/20/2024
 // Team Members: Sho Ishizaki, Maximilliano Vega, Jaylan Wu
 
+// state 0 - 
+// state 1 - 
+
 // Steps:
-// 1) show yellow light for ready to setup
+// 1) show yellow light for ready to setup (state == 0)
 // 2) press button, yellow light turns off
 // 3) record 3 seconds (record x, y, and z into 3 arrays of size 100)
 // 4) show blue light to indicate unlock 
@@ -25,6 +28,13 @@ uint8_t z_array[100];
 // constants
 #define timerCounts 150   // Since we are setting 50 Hz, we get 150 timers counts in 3sec
 
+// control state = 0 waiting for first press of button (that will be when)
+// control state = 1 that is when we read the accel for the first persons gesture
+// control state = 2 wait for second button press
+// control state = 3 one more movement
+// control state = 4 show confirmation
+volatile int controlState = 0;
+
 // variables for the timer
 volatile bool timerActive = false;       // flag indicating timer activity
 volatile unsigned int timerCounter = 0;  // counter for timer 1 overflows
@@ -32,8 +42,10 @@ volatile unsigned int timerCounter = 0;  // counter for timer 1 overflows
 // variables for the accelerometer
 const uint16_t x_low = 0x28;
 const uint16_t x_high = 0x29;
+
 const uint16_t y_low = 0x2A;
 const uint16_t y_high = 0x2B;
+
 const uint16_t z_low = 0x2C;
 const uint16_t z_high = 0x2D;
 
@@ -77,25 +89,45 @@ void setup() {
   // setup accelerometer
   DDRB |= (1 << 4);
 
+  // setup button on PD4
+  DDRD &= ~(1<<4); // Clear DDRD4 Bit to configure as input for the button
+
    // Initialize Serial and SPI
   Serial.begin(9600);
   SPI.begin();
 }
 
 void loop() {
+  // control state 0 - waiting on first button press
+  if (controlState == 0) {
+    // debugging
+    Serial.print("Control State: ");
+    Serial.println(controlState);
 
-  PORTB &= ~(1 << 4);
-  SPI.transfer(0x0F | (1 << 7));
-  uint8_t res = SPI.transfer(0x00);
-  Serial.println(res, BIN);
-
-  PORTB |= (1 << 4);
-  delay(1000);
-
-  // if (!timerActive) {
-  //   delay(1000); // Wait for 1 second
-  //   timerCounter = 0; // Reset the counter
-  //   timerActive = true; // Reactivate the timer
-  //   Serial.println("Timer restarted!");
-  // }
+    // show YELLOW LED on neopixels
+    
+    // read button input
+    if (PIND & (1<<PIND4)) {
+      Serial.println("Button is pressed");
+      controlState = 1;     // move to next state
+      delay(250);
+    }
+  }
+  // control state 1 -  read accel values
+  if (controlState == 1) {
+    Serial.print("Control State: ");
+    Serial.println(controlState);
+  }
+  if (controlState == 2) {
+    Serial.print("Control State: ");
+    Serial.println(controlState);
+  }
+  if (controlState == 3) {
+    Serial.print("Control State: ");
+    Serial.println(controlState);
+  }
+  if (controlState == 4) {
+    Serial.print("Control State: ");
+    Serial.println(controlState);
+  }
 }
