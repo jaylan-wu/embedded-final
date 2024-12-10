@@ -16,7 +16,7 @@
 
 // constants
 #define SPI_CS 4           // Accelerometer SPI CS on PB4
-#define TIMER_COUNT 50*3   // 150 counts for 50Hz in 3sec
+#define TIMER_COUNT 25*3   // 150 counts for 50Hz in 3sec
 #define WINDOW_SIZE 7      // moving average filter window size
 #define NUM_PIXELS 10      // 10 neopixels on the board
 #define NEO_PIN 17         // pin for setting the neopixels
@@ -43,12 +43,16 @@ void setNeo(uint16_t r, uint16_t g, uint16_t b);
 void onButtonPress();
 void startRecording();
 void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ);
+// edit print buffers to run through the list
 void printBuffers();
 
 // accelerometer recordings and windows
-int16_t X_records[TIMER_COUNT] = {0};
-int16_t Y_records[TIMER_COUNT] = {0};
-int16_t Z_records[TIMER_COUNT] = {0};
+int16_t X_key[TIMER_COUNT] = {0};
+int16_t Y_key[TIMER_COUNT] = {0};
+int16_t Z_key[TIMER_COUNT] = {0};
+int16_t X_unlock[TIMER_COUNT] = {0};
+int16_t Y_unlock[TIMER_COUNT] = {0};
+int16_t Z_unlock[TIMER_COUNT] = {0};
 int16_t X_window[WINDOW_SIZE] = {0};
 int16_t Y_window[WINDOW_SIZE] = {0};
 int16_t Z_window[WINDOW_SIZE] = {0};
@@ -56,7 +60,7 @@ int16_t Z_window[WINDOW_SIZE] = {0};
 // -------------- TIMER INTERRUPT -------------- // 
 // timer interrupt on comparison
 ISR(TIMER1_COMPA_vect) {
-  recordValues(X_records, Y_records, Z_records);
+  recordValues(X_key, Y_key, Z_key);
   timerCounter++;
 
   // stop and reset timer when it hits 150
@@ -123,6 +127,7 @@ void loop() {
     // read button input
     onButtonPress();
   }
+
   // control state 4 - reading unlock
   if (controlState == 4) {
     // display ORANGE on neopixels
@@ -214,8 +219,8 @@ void startRecording() {
   TCCR1B |= (1 << CS11) | (1 << CS10);
 
    // calculate the wanted PWM 
-   // (F_CPU / 64) * (1 / 50) = 2500
-  OCR1A = 2500;
+   // (F_CPU / 64) * (1 / 25) = 5000
+  OCR1A = 5000;
   
   // Enable Timer1 compare match interrupt
   TIMSK1 |= (1 << OCIE1A);
@@ -254,8 +259,7 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ) {
   x = (x >> 6);
   y = (y >> 6);
   z = (z >> 6);
-  // Serial.print("Z before filter: ");
-  // Serial.print(z);
+
   for (int i = WINDOW_SIZE-2; i > -1; i--)
   {
     X_window[i+1] = X_window[i];
@@ -271,6 +275,9 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ) {
   X_avg = (X_avg + x)/WINDOW_SIZE;
   Y_avg = (Y_avg + y)/WINDOW_SIZE;
   Z_avg = (Z_avg + z)/WINDOW_SIZE;
+
+  // if on first read set value
+  // on second read subtract from the value
   X_records[timerCounter] = X_avg;
   Y_records[timerCounter] = Y_avg;
   Z_records[timerCounter] = Z_avg;
