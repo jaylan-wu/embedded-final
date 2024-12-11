@@ -43,6 +43,7 @@ void setNeo(uint16_t r, uint16_t g, uint16_t b);
 void onButtonPress();
 void startRecording();
 void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ);
+bool validateSequence();
 // edit print buffers to run through the list
 void printBuffers();
 
@@ -60,10 +61,18 @@ int16_t Z_window[WINDOW_SIZE] = {0};
 // -------------- TIMER INTERRUPT -------------- // 
 // timer interrupt on comparison
 ISR(TIMER1_COMPA_vect) {
-  recordValues(X_key, Y_key, Z_key);
-  timerCounter++;
+  //record the initial key values
+  if (controlState = 1) {
+    recordValues(X_key, Y_key, Z_key);
+    timerCounter++;
+  }
+  //record the unlocking sequence values seperately
+  if (controlState = 3) {
+    recordValues(X_unlock, Y_unlock, Z_unlock);
+    timerCounter++;
+  }
 
-  // stop and reset timer when it hits 150
+  // stop and reset timer when it hits 75
   if (timerCounter == TIMER_COUNT) {
     Serial.print("Timer ended: ");
     Serial.println(timerCounter);
@@ -133,7 +142,7 @@ void loop() {
     // display ORANGE on neopixels
     setNeo(255, 128, 0);
     // simulate recording values
-    delay(3000);
+    startRecording();
     controlState = 4;
   }
 
@@ -145,13 +154,12 @@ void loop() {
   // control state 6 - confirm or deny if unlock was correct
   if (controlState == 6) {
     // this needs to be changed
-    if(true){
+    if(validateSequence()){
       setNeo(0,255,0);      
     }
     else{
       setNeo(255,0,0);
     }
-    
     // read button input
     onButtonPress();
   }
@@ -278,18 +286,28 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ) {
 
   // if on first read set value
   // on second read subtract from the value
-  X_records[timerCounter] = X_avg;
-  Y_records[timerCounter] = Y_avg;
-  Z_records[timerCounter] = Z_avg;
+  X_key[timerCounter] = X_avg;
+  Y_key[timerCounter] = Y_avg;
+  Z_key[timerCounter] = Z_avg;
 }
 
-
+bool validateSequence(){
+  int16_t tolerance = (int16_t)(0.05 * TIMER_COUNT); // 5% tolerance
+  for (int i = 0; i < TIMER_COUNT; i++) {
+    if (abs(X_key[i] - X_unlock[i]) > tolerance ||
+        abs(Y_key[i] - Y_unlock[i]) > tolerance ||
+        abs(Z_key[i] - Z_unlock[i]) > tolerance) {
+      return false;
+    }
+  }
+  return true;
+}
 // -------------- PRINT ACCELEROMETER RECORD-------------- // 
 void printBuffers() {
   for (int i = 0; i < TIMER_COUNT; i++)
   {
     char buffer[30];
-    sprintf(buffer, "X: %4d Y: %4d Z: %4d", X_records[i], Y_records[i], Z_records[i]);
+    sprintf(buffer, "X: %4d Y: %4d Z: %4d", X_key[i], Y_key[i], Z_key[i]);
     Serial.println(buffer);
   }
 }
