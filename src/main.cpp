@@ -47,7 +47,7 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ);
 bool validateSequence();
 // edit print buffers to run through the list
 void printBuffers();
-void printBuffers2();
+void printBuffersAll();
 
 // accelerometer recordings and windows
 int16_t X_key[TIMER_COUNT] = {0};
@@ -166,16 +166,19 @@ void loop() {
 
   // control state 6 - confirm or deny if unlock was correct
   if (controlState == 6) {
+    // print values
     if (showValues2) {
-      printBuffers2();
+      printBuffersAll();
       showValues2 = false;
     }
-    // this needs to be changed
-    if(validateSequence()){
+
+    if (validateSequence()) {
+      // passes
       setNeo(0,255,0);      
       controlState++;
     }
     else{
+      // fails and resets after 2 seconds
       setNeo(255,0,0);
       delay(2000);
       controlState = 3;
@@ -271,13 +274,12 @@ void startRecording() {
 // updates the XYZ accelerometer buffers 
 // uses a moving window average filter with window of size 7
 void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ) {
-  int16_t x;
-  int16_t y;
-  int16_t z;
+  int16_t x, y, z;
   int32_t X_avg = 0;
   int32_t Y_avg = 0;
   int32_t Z_avg = 0;
-  //Continuosly read from OUT_X_L buffer (0x28)
+
+  // continuosly read from OUT_X_L buffer (0x28)
   PORTB &= ~(1 << SPI_CS);
   SPI.transfer(0x28 | 0b11000000);
   x = (int16_t) SPI.transfer(0x00); //Low byte
@@ -289,14 +291,13 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ) {
   PORTB |= (1 << SPI_CS);
 
   //Data in the form of a 10 bit 2's complement left justifed 
-  //If MSB is 0, then shift right by 6
+  //If MSB is 0, then shift right by 4
   //IF MSB is 1, then shift left by 6 and add -1024 
   x = (x >> 4);
   y = (y >> 4);
   z = (z >> 4);
 
-  for (int i = WINDOW_SIZE-2; i > -1; i--)
-  {
+  for (int i = WINDOW_SIZE-2; i > -1; i--) {
     X_window[i+1] = X_window[i];
     Y_window[i+1] = Y_window[i];
     Z_window[i+1] = Z_window[i];
@@ -304,6 +305,7 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ) {
     Y_avg+= Y_window[i+1];
     Z_avg+= Z_window[i+1];
   }
+
   X_window[0] = x;
   Y_window[0] = y;
   Z_window[0] = z;
@@ -311,8 +313,6 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ) {
   Y_avg = (Y_avg + y)/WINDOW_SIZE;
   Z_avg = (Z_avg + z)/WINDOW_SIZE;
 
-  // if on first read set value
-  // on second read subtract from the value
   bufX[timerCounter] = X_avg;
   bufY[timerCounter] = Y_avg;
   bufZ[timerCounter] = Z_avg;
@@ -322,24 +322,26 @@ bool validateSequence(){
   Serial.println("Validating Sequence");
   double tolerance = (0.5); // 50% tolerance
   int failureCount = 0; 
-  for (int i = 10; i < TIMER_COUNT; i += 1) {
+
+  // compare all values
+  for (int i = 10; i < TIMER_COUNT; i++) {
     bool x_valid = abs(((double)X_key[i] - (double)X_unlock[i]) / (double)X_key[i]) < tolerance;
     bool y_valid = abs(((double)Y_key[i] - (double)Y_unlock[i]) / (double)Y_key[i]) < tolerance;
     bool z_valid = abs(((double)Z_key[i] - (double)Z_unlock[i]) / (double)Z_key[i]) < tolerance;
 
-
+    // print buffer comparison
     char buffer[30];
     sprintf(buffer, "X: %4d Y: %4d Z: %4d", x_valid, y_valid, z_valid);
     Serial.println(buffer);
 
+    // failure of 2 or more axes results in an increment in failureCount
     if ((x_valid + y_valid + z_valid) < 2) {
       failureCount++;
     }
 
   }
-  Serial.print("Failure Count: ");
-  Serial.println(failureCount);
-  if (failureCount >= 15) {
+  // failure if fails at 15 or more points
+  if (failureCount >= 15) { 
     return false;
   } else {
     return true;
@@ -347,22 +349,20 @@ bool validateSequence(){
 }
 
 
-// -------------- PRINT ACCELEROMETER RECORD-------------- // 
+// -------------- PRINT ACCELEROMETER RECORD (first set) -------------- // 
 void printBuffers() {
-  for (int i = 0; i < TIMER_COUNT; i++)
-  {
+  for (int i = 0; i < TIMER_COUNT; i++) {
     char buffer[30];
     sprintf(buffer, "X: %4d Y: %4d Z: %4d", X_key[i], Y_key[i], Z_key[i]);
     Serial.println(buffer);
   }
 }
 
-// -------------- PRINT ACCELEROMETER RECORD (second set) -------------- // 
-void printBuffers2() {
-  for (int i = 0; i < TIMER_COUNT; i++)
-  {
+// -------------- PRINT ACCELEROMETER RECORD (both sets) -------------- // 
+void printBuffersAll() {
+  for (int i = 0; i < TIMER_COUNT; i++) {
     char buffer[60];
-    sprintf(buffer, "X: %4d Y: %4d Z: %4d SECOND: X: %4d Y: %4d Z: %4d", 
+    sprintf(buffer, "First: X: %4d Y: %4d Z: %4d Second: X: %4d Y: %4d Z: %4d", 
                 X_key[i], Y_key[i], Z_key[i],
                 X_unlock[i], Y_unlock[i], Z_unlock[i]);
     Serial.println(buffer);
