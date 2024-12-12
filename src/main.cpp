@@ -117,7 +117,7 @@ void loop() {
     // start recording values
     startRecording();
     // move to next state
-    controlState++;
+    controlState = 2;
   }
 
   // control state 2 -  read accel values 3 seconds
@@ -144,15 +144,6 @@ void loop() {
       Z_window[i] = 0;
     }
 
-
-    // for (int i = 0; i < WINDOW_SIZE; i++)
-    // {
-    //   Serial.print(X_window[i]);
-    //   Serial.print(Y_window[i]);
-    //   Serial.print(Z_window[i]);
-    // }
-
-
     // read button input
     onButtonPress();
   }
@@ -161,6 +152,7 @@ void loop() {
   if (controlState == 4) {
     // display ORANGE on neopixels
     setNeo(255, 128, 0);
+
     // simulate recording values
     startRecording();
     
@@ -181,11 +173,13 @@ void loop() {
     // this needs to be changed
     if(validateSequence()){
       setNeo(0,255,0);      
+      controlState++;
     }
     else{
       setNeo(255,0,0);
+      delay(2000);
+      controlState = 3;
     }
-    controlState++;
   }
 
   if (controlState == 7) {
@@ -338,14 +332,14 @@ bool validateSequence(){
     sprintf(buffer, "X: %4d Y: %4d Z: %4d", x_valid, y_valid, z_valid);
     Serial.println(buffer);
 
-    if (!(x_valid && y_valid) || !(x_valid && z_valid) || !(y_valid && z_valid)) {
+    if ((x_valid + y_valid + z_valid) < 2) {
       failureCount++;
     }
 
   }
   Serial.print("Failure Count: ");
   Serial.println(failureCount);
-  if (failureCount > 15) {
+  if (failureCount >= 15) {
     return false;
   } else {
     return true;
