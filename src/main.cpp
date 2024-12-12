@@ -292,11 +292,11 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ) {
 }
 
 bool validateSequence(){
-  int16_t tolerance = (int16_t)(0.05 * TIMER_COUNT); // 5% tolerance
+  int16_t tolerance = (int16_t)(0.05); // 5% tolerance
   for (int i = 0; i < TIMER_COUNT; i++) {
-    if (abs(X_key[i] - X_unlock[i]) > tolerance ||
-        abs(Y_key[i] - Y_unlock[i]) > tolerance ||
-        abs(Z_key[i] - Z_unlock[i]) > tolerance) {
+    if (abs(X_key[i] - X_unlock[i]) / X_key[i] > tolerance ||
+        abs(Y_key[i] - Y_unlock[i]) / Y_key[i] > tolerance ||
+        abs(Z_key[i] - Z_unlock[i]) / Z_key[i] > tolerance) {
       return false;
     }
   }
