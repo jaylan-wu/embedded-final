@@ -17,7 +17,7 @@
 // constants
 #define SPI_CS 4           // Accelerometer SPI CS on PB4
 #define TIMER_COUNT 25*3   // 150 counts for 50Hz in 3sec
-#define WINDOW_SIZE 7      // moving average filter window size
+#define WINDOW_SIZE 31      // moving average filter window size
 #define NUM_PIXELS 10      // 10 neopixels on the board
 #define NEO_PIN 17         // pin for setting the neopixels
 
@@ -33,9 +33,10 @@ volatile int controlState = 0;
 
 // timer variables
 volatile bool showValues = true;       // flag indicating timer activity
+volatile bool showValues2 = true;       // flag indicating timer activity
 volatile unsigned int timerCounter = 0;  // counter for timer 1 overflows
 
-// function setup
+// function setups
 void accelerometerInit();
 void buttonInit();
 void neoInit();
@@ -46,6 +47,7 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ);
 bool validateSequence();
 // edit print buffers to run through the list
 void printBuffers();
+void printBuffers2();
 
 // accelerometer recordings and windows
 int16_t X_key[TIMER_COUNT] = {0};
@@ -62,12 +64,12 @@ int16_t Z_window[WINDOW_SIZE] = {0};
 // timer interrupt on comparison
 ISR(TIMER1_COMPA_vect) {
   //record the initial key values
-  if (controlState = 1) {
+  if (controlState == 2) {
     recordValues(X_key, Y_key, Z_key);
     timerCounter++;
   }
   //record the unlocking sequence values seperately
-  if (controlState = 3) {
+  if (controlState == 5) {
     recordValues(X_unlock, Y_unlock, Z_unlock);
     timerCounter++;
   }
@@ -98,6 +100,7 @@ void setup() {
 }
 
 void loop() {
+  // Serial.println(controlState);
   // control state 0 - waiting on first button press
   if (controlState == 0) {
     // display BLUE on neopixels
@@ -132,7 +135,24 @@ void loop() {
 
     // display PURPLE on neopixels
     setNeo(127, 0, 255);
-    
+
+    //clear the window
+    for (int i = 0; i < WINDOW_SIZE; i++)
+    {
+      X_window[i] = 0;
+      Y_window[i] = 0;
+      Z_window[i] = 0;
+    }
+
+
+    // for (int i = 0; i < WINDOW_SIZE; i++)
+    // {
+    //   Serial.print(X_window[i]);
+    //   Serial.print(Y_window[i]);
+    //   Serial.print(Z_window[i]);
+    // }
+
+
     // read button input
     onButtonPress();
   }
@@ -143,7 +163,8 @@ void loop() {
     setNeo(255, 128, 0);
     // simulate recording values
     startRecording();
-    controlState = 4;
+    
+    controlState++;
   }
 
   // control state 5 -  read accel values 3 seconds
@@ -153,6 +174,10 @@ void loop() {
 
   // control state 6 - confirm or deny if unlock was correct
   if (controlState == 6) {
+    if (showValues2) {
+      printBuffers2();
+      showValues2 = false;
+    }
     // this needs to be changed
     if(validateSequence()){
       setNeo(0,255,0);      
@@ -160,6 +185,10 @@ void loop() {
     else{
       setNeo(255,0,0);
     }
+    controlState++;
+  }
+
+  if (controlState == 7) {
     // read button input
     onButtonPress();
   }
@@ -170,7 +199,11 @@ void loop() {
 void accelerometerInit() {
   PORTB &= ~(1 << SPI_CS);    // pull down the accel SPI CS
   SPI.transfer(0x20);         // LIS3DH control register 1
-  SPI.transfer(0b01000111);   // LIS3DH control register 1 settings
+  SPI.transfer(0b00110111);   // LIS3DH control register 1 settings
+  PORTB |= (1 << SPI_CS);     // release the accel SPI CS
+  PORTB &= ~(1 << SPI_CS);    // pull down the accel SPI CS
+  SPI.transfer(0x23);         // LIS3DH control register 4
+  SPI.transfer(0b00001000);   // LIS3DH control register 4 settings
   PORTB |= (1 << SPI_CS);     // release the accel SPI CS
 } 
 
@@ -201,12 +234,12 @@ void setNeo(uint16_t r, uint16_t g, uint16_t b) {
 // -------------- BUTTON PRESS -------------- // 
 void onButtonPress() {
   if (PIND & (1<<PIND4)) {
-    if (controlState == 4) {
+    if (controlState == 7) {
       controlState = 0;
     } else {
       controlState++;     // move to next state
     }
-    delay(250);
+    delay(400);
   }
 }
 
@@ -264,9 +297,9 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ) {
   //Data in the form of a 10 bit 2's complement left justifed 
   //If MSB is 0, then shift right by 6
   //IF MSB is 1, then shift left by 6 and add -1024 
-  x = (x >> 6);
-  y = (y >> 6);
-  z = (z >> 6);
+  x = (x >> 4);
+  y = (y >> 4);
+  z = (z >> 4);
 
   for (int i = WINDOW_SIZE-2; i > -1; i--)
   {
@@ -286,28 +319,58 @@ void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ) {
 
   // if on first read set value
   // on second read subtract from the value
-  X_key[timerCounter] = X_avg;
-  Y_key[timerCounter] = Y_avg;
-  Z_key[timerCounter] = Z_avg;
+  bufX[timerCounter] = X_avg;
+  bufY[timerCounter] = Y_avg;
+  bufZ[timerCounter] = Z_avg;
 }
 
 bool validateSequence(){
-  int16_t tolerance = (int16_t)(0.05); // 5% tolerance
-  for (int i = 0; i < TIMER_COUNT; i++) {
-    if (abs(X_key[i] - X_unlock[i]) / X_key[i] > tolerance ||
-        abs(Y_key[i] - Y_unlock[i]) / Y_key[i] > tolerance ||
-        abs(Z_key[i] - Z_unlock[i]) / Z_key[i] > tolerance) {
-      return false;
+  Serial.println("Validating Sequence");
+  double tolerance = (0.5); // 50% tolerance
+  int failureCount = 0; 
+  for (int i = 10; i < TIMER_COUNT; i += 1) {
+    bool x_valid = abs(((double)X_key[i] - (double)X_unlock[i]) / (double)X_key[i]) < tolerance;
+    bool y_valid = abs(((double)Y_key[i] - (double)Y_unlock[i]) / (double)Y_key[i]) < tolerance;
+    bool z_valid = abs(((double)Z_key[i] - (double)Z_unlock[i]) / (double)Z_key[i]) < tolerance;
+
+
+    char buffer[30];
+    sprintf(buffer, "X: %4d Y: %4d Z: %4d", x_valid, y_valid, z_valid);
+    Serial.println(buffer);
+
+    if (!(x_valid && y_valid) || !(x_valid && z_valid) || !(y_valid && z_valid)) {
+      failureCount++;
     }
+
   }
-  return true;
+  Serial.print("Failure Count: ");
+  Serial.println(failureCount);
+  if (failureCount > 15) {
+    return false;
+  } else {
+    return true;
+  }
 }
+
+
 // -------------- PRINT ACCELEROMETER RECORD-------------- // 
 void printBuffers() {
   for (int i = 0; i < TIMER_COUNT; i++)
   {
     char buffer[30];
     sprintf(buffer, "X: %4d Y: %4d Z: %4d", X_key[i], Y_key[i], Z_key[i]);
+    Serial.println(buffer);
+  }
+}
+
+// -------------- PRINT ACCELEROMETER RECORD (second set) -------------- // 
+void printBuffers2() {
+  for (int i = 0; i < TIMER_COUNT; i++)
+  {
+    char buffer[60];
+    sprintf(buffer, "X: %4d Y: %4d Z: %4d SECOND: X: %4d Y: %4d Z: %4d", 
+                X_key[i], Y_key[i], Z_key[i],
+                X_unlock[i], Y_unlock[i], Z_unlock[i]);
     Serial.println(buffer);
   }
 }
