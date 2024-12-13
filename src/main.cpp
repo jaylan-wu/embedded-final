@@ -2,13 +2,16 @@
 // Due 12/20/2024
 // Team Members: Sho Ishizaki, Maximilliano Vega, Jaylan Wu
 
-// Steps:
-// 1) show yellow light for ready to setup (state == 0)
-// 2) press button, yellow light turns off
-// 3) record 3 seconds (record x, y, and z into 3 arrays of size 100)
-// 4) show blue light to indicate unlock 
-// 5) record 3 seconds and do logic while taking values
-// 6) show red light if failed, green if pass
+// Project Pseudo Steps:
+// 1) show blue light for ready to setup
+// 2) press button, orange light turns on
+// 3) record 3 seconds (record x, y, and z into 3 arrays of size 75)
+// 4) show purple light to indicate ready to unlock 
+// 5) press button, orange light turns on
+// 6) record 3 seconds and log values
+// 7) validate sequence
+// 8) show red light if failed, green if pass
+// 9) loop to step 4 if failed. Press button to reset to step 1 if pass. 
 
 #include <Arduino.h>
 #include <colorlib.h> // modified Adafruit_Neopixel library 
@@ -24,11 +27,14 @@
 // neopixel LED setup
 colorlib strip(NUM_PIXELS, NEO_PIN);
 
-// control state = 0 waiting for first press of button (that will be when)
-// control state = 1 that is when we read the accel for the first persons gesture
-// control state = 2 wait for second button press
-// control state = 3 one more movement
-// control state = 4 show confirmation
+// control state = 0 waiting for first press of button 
+// control state = 1 read button press
+// control state = 2 read values from accelerometer 
+// control state = 3 wait for second button press
+// control state = 4 read second button press
+// control state = 5 read values for unlock from accelerometer
+// control state = 6 validate unlock
+// control state = 7 wait on button press to reset if passed
 volatile int controlState = 0;
 
 // timer variables
@@ -45,7 +51,6 @@ void onButtonPress();
 void startRecording();
 void recordValues(int16_t *bufX, int16_t *bufY, int16_t *bufZ);
 bool validateSequence();
-// edit print buffers to run through the list
 void printBuffers();
 void printBuffersAll();
 
