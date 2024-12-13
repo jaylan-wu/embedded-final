@@ -19,8 +19,8 @@
 
 // constants
 #define SPI_CS 4           // Accelerometer SPI CS on PB4
-#define TIMER_COUNT 25*3   // 150 counts for 50Hz in 3sec
-#define WINDOW_SIZE 31      // moving average filter window size
+#define TIMER_COUNT 25*3   // 75 counts for 25Hz in 3sec
+#define WINDOW_SIZE 31     // moving average filter window size
 #define NUM_PIXELS 10      // 10 neopixels on the board
 #define NEO_PIN 17         // pin for setting the neopixels
 
@@ -343,8 +343,8 @@ bool validateSequence(){
     if ((x_valid + y_valid + z_valid) < 2) {
       failureCount++;
     }
-
   }
+
   // failure if fails at 15 or more points
   if (failureCount >= 15) { 
     return false;
@@ -352,7 +352,6 @@ bool validateSequence(){
     return true;
   }
 }
-
 
 // -------------- PRINT ACCELEROMETER RECORD (first set) -------------- // 
 void printBuffers() {
